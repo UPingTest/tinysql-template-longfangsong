@@ -16,6 +16,7 @@ package tablecodec
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"time"
 
@@ -71,7 +72,24 @@ func EncodeRowKeyWithHandle(tableID int64, handle int64) kv.Key {
 
 // DecodeRecordKey decodes the key and gets the tableID, handle.
 func DecodeRecordKey(key kv.Key) (tableID int64, handle int64, err error) {
-	/* Your code here */
+	if !key.HasPrefix(tablePrefix) {
+		return 0, 0, fmt.Errorf("invalid recordKey")
+	}
+	key = key[tablePrefixLength:]
+	key, tableID, err = codec.DecodeInt(key)
+	if err != nil {
+		return
+	}
+	if !key.HasPrefix(recordPrefixSep) {
+		return tableID, 0, fmt.Errorf("invalid recordKey")
+	}
+	key = key[recordPrefixSepLength:]
+	key, handle, err = codec.DecodeInt(key)
+	if len(key) != 0 {
+		// I'm not sure not-consuming all key is an error
+		// but you do can ignore it
+		return tableID, handle, fmt.Errorf("recordKey's length is larger than expected")
+	}
 	return
 }
 
@@ -94,7 +112,21 @@ func EncodeIndexSeekKey(tableID int64, idxID int64, encodedValue []byte) kv.Key 
 
 // DecodeIndexKeyPrefix decodes the key and gets the tableID, indexID, indexValues.
 func DecodeIndexKeyPrefix(key kv.Key) (tableID int64, indexID int64, indexValues []byte, err error) {
-	/* Your code here */
+	if !key.HasPrefix(tablePrefix) {
+		return 0, 0, nil, fmt.Errorf("invalid index key")
+	}
+	key = key[tablePrefixLength:]
+	key, tableID, err = codec.DecodeInt(key)
+	if err != nil {
+		return
+	}
+	if !key.HasPrefix(indexPrefixSep) {
+		return 0, 0, nil, fmt.Errorf("invalid index key")
+	}
+	// I'm not very sure why there's no indexPrefixSepLength
+	key = key[len(indexPrefixSep):]
+	key, indexID, err = codec.DecodeInt(key)
+	indexValues = key
 	return tableID, indexID, indexValues, nil
 }
 
